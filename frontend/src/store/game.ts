@@ -211,6 +211,20 @@ export const useGameStore = defineStore('game', () => {
   const currentMoveCount = computed(() => moves.value.length);
   const isGameOver = computed(() => status.value === 'finished');
 
+  const replayCurrentResult = computed(() => {
+    if (status.value !== 'replaying' || replayIndex.value === 0) return '';
+    const lastMove = replayMoves.value[replayIndex.value - 1];
+    if (checkWinAt(replayBoard.value, lastMove.row, lastMove.col, lastMove.player)) {
+      return lastMove.player === BLACK ? '黑棋五连，黑棋胜' : '白棋五连，白棋胜';
+    }
+    if (replayIndex.value === replayMoves.value.length) {
+      const record = gameRecords.value.find(r => r.moves === replayMoves.value);
+      if (record && record.winner === 0) return '棋盘已满，平局';
+    }
+    const nextPlayer = lastMove.player === BLACK ? WHITE : BLACK;
+    return `轮到${nextPlayer === BLACK ? '黑' : '白'}棋落子`;
+  });
+
   function startGame() {
     board.value = createEmptyBoard();
     currentPlayer.value = BLACK;
@@ -299,6 +313,17 @@ export const useGameStore = defineStore('game', () => {
     replayIndex.value = 0;
   }
 
+  function replayGoToMove(index: number) {
+    if (index < 0) index = 0;
+    if (index > replayMoves.value.length) index = replayMoves.value.length;
+    replayBoard.value = createEmptyBoard();
+    for (let i = 0; i < index; i++) {
+      const m = replayMoves.value[i];
+      replayBoard.value[m.row][m.col] = m.player;
+    }
+    replayIndex.value = index;
+  }
+
   function replayGoToEnd() {
     replayBoard.value = createEmptyBoard();
     for (let i = 0; i < replayMoves.value.length; i++) {
@@ -358,9 +383,9 @@ export const useGameStore = defineStore('game', () => {
   return {
     board, currentPlayer, moves, status, winner, gameRecords, aiConfig, isAiThinking,
     replayMoves, replayIndex, replayBoard, isReplayPlaying, replaySpeed,
-    currentMoveCount, isGameOver,
+    currentMoveCount, isGameOver, replayCurrentResult,
     startGame, placeStone, aiMove, saveRecord,
-    startReplay, replayStepForward, replayStepBack, replayGoToStart, replayGoToEnd,
+    startReplay, replayStepForward, replayStepBack, replayGoToStart, replayGoToEnd, replayGoToMove,
     toggleReplayPlay, setReplaySpeed, stopReplay, checkWin,
   };
 });
