@@ -191,18 +191,41 @@ function getAIMove(board: BoardState, aiPlayer: number, depth: number): [number,
 
 // --- Store ---
 
+const STORAGE_KEY = 'gobang_game_records';
+
+function loadRecordsFromStorage(): GameRecord[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) return data;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecordsToStorage(records: GameRecord[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  } catch {
+    // ignore
+  }
+}
+
 export const useGameStore = defineStore('game', () => {
   const board = ref<BoardState>(createEmptyBoard());
   const currentPlayer = ref<number>(BLACK);
   const moves = ref<Move[]>([]);
   const status = ref<GameStatus>('idle');
   const winner = ref<number | null>(null);
-  const gameRecords = ref<GameRecord[]>([]);
+  const gameRecords = ref<GameRecord[]>(loadRecordsFromStorage());
   const aiConfig = ref<AIConfig>({ depth: 3, enabled: true, playerColor: WHITE });
   const isAiThinking = ref(false);
 
   // Replay
   const replayMoves = ref<Move[]>([]);
+  const replayRecordId = ref<string | null>(null);
   const replayIndex = ref(0);
   const replayBoard = ref<BoardState>(createEmptyBoard());
   const isReplayPlaying = ref(false);
@@ -217,8 +240,8 @@ export const useGameStore = defineStore('game', () => {
     if (checkWinAt(replayBoard.value, lastMove.row, lastMove.col, lastMove.player)) {
       return lastMove.player === BLACK ? '黑棋五连，黑棋胜' : '白棋五连，白棋胜';
     }
-    if (replayIndex.value === replayMoves.value.length) {
-      const record = gameRecords.value.find(r => r.moves === replayMoves.value);
+    if (replayIndex.value === replayMoves.value.length && replayRecordId.value) {
+      const record = gameRecords.value.find(r => r.id === replayRecordId.value);
       if (record && record.winner === 0) return '棋盘已满，平局';
     }
     const nextPlayer = lastMove.player === BLACK ? WHITE : BLACK;
@@ -284,10 +307,12 @@ export const useGameStore = defineStore('game', () => {
       duration: moves.value.length > 0 ? moves.value[moves.value.length - 1].timestamp - moves.value[0].timestamp : 0,
     };
     gameRecords.value.unshift(record);
+    saveRecordsToStorage(gameRecords.value);
   }
 
   function startReplay(record: GameRecord) {
     replayMoves.value = [...record.moves];
+    replayRecordId.value = record.id;
     replayIndex.value = 0;
     replayBoard.value = createEmptyBoard();
     status.value = 'replaying';
@@ -382,7 +407,7 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     board, currentPlayer, moves, status, winner, gameRecords, aiConfig, isAiThinking,
-    replayMoves, replayIndex, replayBoard, isReplayPlaying, replaySpeed,
+    replayMoves, replayRecordId, replayIndex, replayBoard, isReplayPlaying, replaySpeed,
     currentMoveCount, isGameOver, replayCurrentResult,
     startGame, placeStone, aiMove, saveRecord,
     startReplay, replayStepForward, replayStepBack, replayGoToStart, replayGoToEnd, replayGoToMove,
